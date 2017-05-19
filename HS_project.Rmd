@@ -1,0 +1,344 @@
+---
+title: "Alzheimer's Simulation Project"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is a data simulation project based of a study conducted by Friedland et al that was published in 2001 in PNAS called: 
+
+Patients with Alzheimer's disease have reduced activities in midlife compared with healthy control-group members
+https://www.ncbi.nlm.nih.gov/pmc/articles/PMC30672/
+
+It was a study that was focused on the correlations between activity levels and Alzheimer's disease (AD). Previous studies have shown certain activities to be correlated with a higher risk for AD. In this study, the focus is instead on identifying correlations between activity levels and AD, which showed that reduced activity levels correlated with AD. 
+
+The simulated data is based on a survey of different activities that fall under three types:
+
+a) passive activities (ex. watching TV)
+
+b) intellectual activities (ex. reading a book)
+
+c) physical activities (ex. jogging)
+
+
+The primary predictor variables are:
+
+1. Diversity - How many different activities within each type (passive, intellectual, physical)?
+
+2. Intensity - How many hours per month invested per activity?
+
+3. Percent Intensity - Fraction of hours invested in each type of activity
+
+4. Age - Assessed activities during early adulthood (20-30s) and middle adulthood (40-50s)
+
+
+STEP 1: Loading required packages and setting seed
+```{r}
+library(dplyr)
+library(corrplot)
+library(ggplot2)
+set.seed(100)
+```
+
+STEP 2: Generating participant data
+```{r}
+#generate age data for AD cases
+age.m <- data.frame(rnorm(250, 72.2, 7.3))
+age.f <- data.frame(rnorm(250, 72.7, 8.5))
+names(age.m) <- "age"
+names(age.f) <- "age"
+summary(age.m) #summary of age for male AD cases
+summary(age.f) #summary of age for female AD cases
+age.m$gender <- "Male"
+age.f$gender <- "Female"
+dat1 <- rbind(age.m, age.f)
+#sample age data
+dat1 <- sample_n(dat1, 193)
+dat1$category <- "AD"
+
+##generate age data for AD controls
+age.mc <- data.frame(rnorm(500, 71.7, 5.2))
+age.fc <- data.frame(rnorm(500, 71, 6.4))
+names(age.mc) <- "age"
+names(age.fc) <- "age"
+summary(age.mc) #summary of age for male control cases
+summary(age.fc) #summary of age for female control cases
+age.mc$gender <- "Male"
+age.fc$gender <- "Female"
+dat2 <- rbind(age.mc, age.fc)
+#sample age data
+dat2 <- sample_n(dat2, 358)
+dat2$category <- "Control"
+```
+
+STEP 3: Simulate data for AD cases based on reported mean and SD
+```{r}
+n <- 193
+#diversity
+pass.div <- rnorm(n, 0.84, 0.18)
+int.div <- rnorm(n, 0.43, 0.19)
+phys.div <- rnorm(n, 0.39, 0.22)
+#replace negative values with zero
+pass.div <- ifelse(pass.div<0, 0, pass.div)
+int.div <- ifelse(int.div<0, 0, int.div)
+phys.div <- ifelse(phys.div<0, 0, phys.div)
+
+#early adulthood intensity
+pass.itsE <- rnorm(n, 59.28, 50.27)
+int.itsE <- rnorm(n, 55.63, 40.36)
+phys.itsE <- rnorm(n, 32.06, 33.66)
+#replace negative values with zero
+pass.itsE <- ifelse(pass.itsE<0, 0, pass.itsE)
+int.itsE <- ifelse(int.itsE<0, 0, int.itsE)
+phys.itsE <- ifelse(phys.itsE<0, 0, phys.itsE)
+#replace high numbers with mean + 1 SD
+pass.itsE <- ifelse(pass.itsE>59.28+50.27, 59.28, pass.itsE)
+int.itsE <- ifelse(int.itsE>55.63+40.36, 55.63, int.itsE)
+phys.itsE <- ifelse(phys.itsE>32.06+33.66, 32.06, phys.itsE)
+```
+
+STEP 4: Correlate middle adulthood intensity to early adulthood intensity for AD cases
+```{r}
+#middle adulthood intensity - adjusted for Alzheimer's category using early adulthood intensity
+pass.itsM <- pass.itsE*rnorm(n, (98.9/59.28), ((68.82/98.9)+(50.27/59.28))/4)
+int.itsM <- int.itsE*rnorm(n, (68.06/55.63), ((59.8/68.06)+(40.36/55.63))/4)
+phys.itsM <- phys.itsE*rnorm(n, (38.12/32.06), ((38.13/38.12)+(33.66/32.06))/4)
+#replace negative values with zero
+pass.itsM <- ifelse(pass.itsM<0, 0, pass.itsM)
+int.itsM <- ifelse(int.itsM<0, 0, int.itsM)
+phys.itsM <- ifelse(phys.itsM<0, 0, phys.itsM)
+#replace high numbers with mean + 1 SD
+pass.itsM <- ifelse(pass.itsM>98.9+68.82, 98.9, pass.itsM)
+int.itsM <- ifelse(int.itsM>68.06+59.8, 68.06, int.itsM)
+phys.itsM <- ifelse(phys.itsM>38.12+38.13, 38.12, phys.itsM)
+
+#cbind all AD features
+dat1 <- cbind(pass.div, int.div, phys.div, pass.itsE, int.itsE, phys.itsE,
+              pass.itsM, int.itsM, phys.itsM, dat1)
+```
+
+STEP 5: Simulate data for control cases based on reported mean and SD
+```{r}
+n <- 358
+#diversity
+pass.div <- rnorm(n, 0.91, 0.14)
+int.div <- rnorm(n, 0.54, 0.16)
+phys.div <- rnorm(n, 0.55, 0.22)
+#replace negative values with zero
+pass.div <- ifelse(pass.div<0, 0, pass.div)
+int.div <- ifelse(int.div<0, 0, int.div)
+phys.div <- ifelse(phys.div<0, 0, phys.div)
+
+#early adulthood intensity
+pass.itsE <- rnorm(n, 69.88, 55.71)
+int.itsE <- rnorm(n, 68.79, 52.23)
+phys.itsE <- rnorm(n, 33.97, 34.58)
+#replace negative values with zero
+pass.itsE <- ifelse(pass.itsE<0, 0, pass.itsE)
+int.itsE <- ifelse(int.itsE<0, 0, int.itsE)
+phys.itsE <- ifelse(phys.itsE<0, 0, phys.itsE)
+#replace high numbers with mean + 1 SD
+pass.itsE <- ifelse(pass.itsE>69.88+55.71, 69.88, pass.itsE)
+int.itsE <- ifelse(int.itsE>68.79+52.23, 68.79, int.itsE)
+phys.itsE <- ifelse(phys.itsE>34.58+33.97, 33.97, phys.itsE)
+```
+
+STEP 6: Correlate middle adulthood intensity to early adulthood intensity for control cases
+```{r}
+#middle adulthood intensity
+pass.itsM <- pass.itsE*rnorm(n, (101.89/69.88), ((61.31/101.89)+(55.71/69.88))/4)
+int.itsM <- int.itsE*rnorm(n, (79.14/68.79), ((55.66/79.14)+(52.23/68.79))/4)
+phys.itsM <- phys.itsE*rnorm(n, (40.8/33.97), ((33.43/40.8)+(34.58/33.97))/4)
+#replace negative values with zero
+pass.itsM <- ifelse(pass.itsM<0, 0, pass.itsM)
+int.itsM <- ifelse(int.itsM<0, 0, int.itsM)
+phys.itsM <- ifelse(phys.itsM<0, 0, phys.itsM)
+#replace high numbers with mean + 1 SD
+pass.itsM <- ifelse(pass.itsM>101.89+61.31, 101.89, pass.itsM)
+int.itsM <- ifelse(int.itsM>79.14+55.66, 79.14, int.itsM)
+phys.itsM <- ifelse(phys.itsM>40.8+33.43, 40.8, phys.itsM)
+
+#cbind all control features
+dat2 <- cbind(pass.div, int.div, phys.div, pass.itsE, int.itsE, phys.itsE,
+              pass.itsM, int.itsM, phys.itsM, dat2)
+
+#rbind all features
+dats <- rbind(dat1, dat2)
+```
+
+STEP 7: Clean data based on inconsistencies (ex. non-zero intensity for zero diversity - 20hrs for 0 passive activities) 
+```{r}
+#replace all intensity/percent intensity with zeroes for zero diversity
+dats$pass.itsE <- ifelse(dats$pass.div==0, 0, dats$pass.itsE)
+dats$int.itsE <- ifelse(dats$int.div==0, 0, dats$int.itsE)
+dats$phys.itsE <- ifelse(dats$phys.div==0, 0, dats$phys.itsE)
+dats$pass.itsM <- ifelse(dats$pass.div==0, 0, dats$pass.itsM)
+dats$int.itsM <- ifelse(dats$int.div==0, 0, dats$int.itsM)
+dats$phys.itsM <- ifelse(dats$phys.div==0, 0, dats$phys.itsM)
+
+#replace all zero intensity for non-zero diversity (0 hrs for 2 passive activities)
+#pass intensity early
+for (k in seq(nrow(dats))){
+  if (dats$pass.div[k]!=0 && dats$pass.itsE[k]==0){
+    while (dats$pass.itsE[k]==0){
+      if (dats$category[k]=="AD"){
+        dats$pass.itsE[k] <- rnorm(1, 59.28, 50.27)
+        dats$pass.itsE[k] <- ifelse(dats$pass.itsE[k]<0, 0, dats$pass.itsE[k])
+      } else {
+        dats$pass.itsE[k] <- rnorm(1, 69.88, 55.71)
+        dats$pass.itsE[k] <- ifelse(dats$pass.itsE[k]<0, 0, dats$pass.itsE[k])
+      }
+    }
+  }
+}
+
+#int intensity early
+for (k in seq(nrow(dats))){
+  if (dats$int.div[k]!=0 && dats$int.itsE[k]==0){
+    while (dats$int.itsE[k]==0){
+      if (dats$category[k]=="AD"){
+        dats$int.itsE[k] <- rnorm(1, 55.63, 40.36)
+        dats$int.itsE[k] <- ifelse(dats$int.itsE[k]<0, 0, dats$int.itsE[k])
+      } else {
+        dats$int.itsE[k] <- rnorm(1, 68.79, 52.23)
+        dats$int.itsE[k] <- ifelse(dats$int.itsE[k]<0, 0, dats$int.itsE[k])
+      }
+    }
+  }
+}
+
+#phys intensity early
+for (k in seq(nrow(dats))){
+  if (dats$phys.div[k]!=0 && dats$phys.itsE[k]==0){
+    while (dats$phys.itsE[k]==0){
+      if (dats$category[k]=="AD"){
+        dats$phys.itsE[k] <- rnorm(1, 32.06, 33.66)
+        dats$phys.itsE[k] <- ifelse(dats$phys.itsE[k]<0, 0, dats$phys.itsE[k])
+      } else {
+        dats$phys.itsE[k] <- rnorm(1, 33.97, 34.58)
+        dats$phys.itsE[k] <- ifelse(dats$phys.itsE[k]<0, 0, dats$phys.itsE[k])
+      }
+    }
+  }
+}
+
+#pass intensity middle
+for (k in seq(nrow(dats))){
+  if (dats$pass.div[k]!=0 && dats$pass.itsM[k]==0){
+    while (dats$pass.itsM[k]==0){
+      if (dats$category[k]=="AD"){
+        dats$pass.itsM[k] <- rnorm(1, 98.9, 68.82)
+        dats$pass.itsM[k] <- ifelse(dats$pass.itsM[k]<0, 0, dats$pass.itsM[k])
+      } else {
+        dats$pass.itsM[k] <- rnorm(1, 101.89, 61.31)
+        dats$pass.itsM[k] <- ifelse(dats$pass.itsM[k]<0, 0, dats$pass.itsM[k])
+      }
+    }
+  }
+}
+
+#int intensity middle
+for (k in seq(nrow(dats))){
+  if (dats$int.div[k]!=0 && dats$int.itsM[k]==0){
+    while (dats$int.itsM[k]==0){
+      if (dats$category[k]=="AD"){
+        dats$int.itsM[k] <- rnorm(1, 68.06, 59.8)
+        dats$int.itsM[k] <- ifelse(dats$int.itsM[k]<0, 0, dats$int.itsM[k])
+      } else {
+        dats$int.itsM[k] <- rnorm(1, 79.14, 55.66)
+        dats$int.itsM[k] <- ifelse(dats$int.itsM[k]<0, 0, dats$int.itsM[k])
+      }
+    }
+  }
+}
+
+#phys intensity middle
+for (k in seq(nrow(dats))){
+  if (dats$phys.div[k]!=0 && dats$phys.itsM[k]==0){
+    while (dats$phys.itsM[k]==0){
+      if (dats$category[k]=="AD"){
+        dats$phys.itsM[k] <- rnorm(1, 38.12, 38.13)
+        dats$phys.itsM[k] <- ifelse(dats$phys.itsM[k]<0, 0, dats$phys.itsM[k])
+      } else {
+        dats$phys.itsM[k] <- rnorm(1, 40.8, 33.43)
+        dats$phys.itsM[k] <- ifelse(dats$phys.itsM[k]<0, 0, dats$phys.itsM[k])
+      }
+    }
+  }
+}
+
+#sum of all intensities to check for unrealistic values
+dats$pass.itstotE <- dats$pass.itsE + dats$int.itsE + dats$phys.itsE
+dats$pass.itstotM <- dats$pass.itsM + dats$int.itsM + dats$phys.itsM
+```
+
+STEP 8: Correlate percent intensity to simulated intensity data
+```{r}
+#early adult percent intensity
+dats$pass.perE <- 100*dats$pass.itsE / (dats$pass.itsE+dats$int.itsE+dats$phys.itsE)
+dats$int.perE <- 100*dats$int.itsE / (dats$pass.itsE+dats$int.itsE+dats$phys.itsE)
+dats$phys.perE <- 100*dats$phys.itsE / (dats$pass.itsE+dats$int.itsE+dats$phys.itsE)
+
+#middle adult percent intensity
+dats$pass.perM <- 100*dats$pass.itsM / (dats$pass.itsM+dats$int.itsM+dats$phys.itsM)
+dats$int.perM <- 100*dats$int.itsM / (dats$pass.itsM+dats$int.itsM+dats$phys.itsM)
+dats$phys.perM <- 100*dats$phys.itsM / (dats$pass.itsM+dats$int.itsM+dats$phys.itsM)
+
+#pass percent difference
+dats$passChg <- dats$pass.perM - dats$pass.perE
+dats$intChg <- dats$int.perM - dats$int.perE
+dats$physChg <- dats$phys.perM - dats$phys.perE
+
+#reorganize columns
+dats <- dats[, c(1:9, 13:23, 10:12)]
+dats$gender <- factor(dats$gender)
+dats$category <- factor(dats$category)
+
+#summary
+summary(dats)
+```
+
+STEP 9: Visualize simulated data
+```{r}
+#correlation plots
+c <- cor(dats[,c(1:18)], use= "pairwise.complete.obs")
+corrplot(c)
+
+#scatter plots of correlated variables
+g <- ggplot(dats)
+#correlated data between intensity and percent intensity
+g+geom_point(aes(x=int.itsE, y=int.perE, color=category))
+#correlated data between early adulthood intensity and middle adulthood intensity
+g+geom_point(aes(x=int.itsE, y=int.itsM, color=category))
+#comparison of diversity between AD and control cases
+g+geom_boxplot(aes(x=category, y=int.div, fill=category))
+#comparison of diversity by density plot
+g+geom_density(aes(x=int.div, fill=category, alpha=0.3))
+#comparison of percent intensity changes from early to middle adulthood
+g+geom_point(aes(x=int.itsE, y=intChg, color=category))
+#comparison of percent intensity between AD and control cases
+g+geom_boxplot(aes(x=category, y=intChg, fill=category))
+```
+
+STEP 10: Assess mean differences in simulated intensity and percent intensity data
+```{r}
+#separate by category
+subAlz <- filter(dats, category=="AD")
+subCtr <- subset(dats, category=="Control")
+
+#comparison of early adulthood intensity
+t.test(subAlz$int.itsE, subCtr$int.itsE)
+#comparison of early adulthood percent intensity
+t.test(subAlz$int.perE, subCtr$int.perE)
+#comparison of middle adulthood intensity
+t.test(subAlz$int.itsM, subCtr$int.itsM)
+#comparison of middle adulthood percent intensity
+t.test(subAlz$int.perM, subCtr$int.perM)
+#comparison of changes in percent intensity between AD and control cases
+t.test(subAlz$intChg, subCtr$intChg)
+```
+
+CONCLUSIONS:
+The primary conclusions of the study was that reduced activity levels correlated with higher risk for AD. Based on the simulated data, diversity measurements were reduced for AD cases across all three types of activities (passive, intellectual, and physical). Additionally, the simulated data indicates a significant difference in the intensity and percent intensity levels between AD and control cases. However, the changes in the percent intensities between AD and control cases was insignificant. This may be due to the absurdly high report values for the standard deviations. 
